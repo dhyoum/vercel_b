@@ -1,11 +1,15 @@
-"use client"
-
 import { useEffect, useRef } from 'react';
-import { createChart, ColorType, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, AreaSeries, LineSeries, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { StockDataPoint } from '@/lib/data';
 
 interface TradingViewChartProps {
     data: StockDataPoint[];
+    chartType?: 'Candlestick' | 'Area' | 'Line';
+    indicators?: {
+        name: string;
+        data: { time: string; value: number }[];
+        color: string;
+    }[];
     colors?: {
         backgroundColor?: string;
         lineColor?: string;
@@ -15,53 +19,86 @@ interface TradingViewChartProps {
     };
 }
 
-export const TradingViewChart = ({ data, colors = {} }: TradingViewChartProps) => {
+export const TradingViewChart = ({ data, chartType = 'Candlestick', indicators = [], colors = {} }: TradingViewChartProps) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartRef = useRef<IChartApi | null>(null);
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
         const handleResize = () => {
-            chart.applyOptions({ width: chartContainerRef.current!.clientWidth });
+            if (chartRef.current && chartContainerRef.current) {
+                chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+            }
         };
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                background: { type: ColorType.Solid, color: colors.backgroundColor || '#1e1e1e' },
-                textColor: colors.textColor || 'white',
+                background: { type: ColorType.Solid, color: colors.backgroundColor || '#ffffff' },
+                textColor: colors.textColor || '#333',
             },
             width: chartContainerRef.current.clientWidth,
-            height: 400,
+            height: 480, // Increased height
             grid: {
-                vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                vertLines: { color: 'rgba(42, 46, 57, 0.06)' },
+                horzLines: { color: 'rgba(42, 46, 57, 0.06)' },
             },
             crosshair: {
                 mode: CrosshairMode.Normal,
             },
-            timeScale: {
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-            },
             rightPriceScale: {
-                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderColor: 'rgba(197, 203, 206, 0.4)',
+            },
+            timeScale: {
+                borderColor: 'rgba(197, 203, 206, 0.4)',
             },
         });
 
-        const candlestickSeries = chart.addSeries(CandlestickSeries, {
-            upColor: '#26a69a',
-            downColor: '#ef5350',
-            borderVisible: false,
-            wickUpColor: '#26a69a',
-            wickDownColor: '#ef5350',
+        chartRef.current = chart;
+
+        // Main Series
+        let mainSeries: ISeriesApi<"Candlestick" | "Area" | "Line">;
+
+        if (chartType === 'Area') {
+            mainSeries = chart.addSeries(AreaSeries, {
+                lineColor: colors.lineColor || '#2962FF',
+                topColor: colors.areaTopColor || 'rgba(41, 98, 255, 0.3)',
+                bottomColor: colors.areaBottomColor || 'rgba(41, 98, 255, 0)',
+            });
+            mainSeries.setData(data.map(d => ({ time: d.time, value: d.close })));
+        } else if (chartType === 'Line') {
+            mainSeries = chart.addSeries(LineSeries, {
+                color: colors.lineColor || '#2962FF',
+            });
+            mainSeries.setData(data.map(d => ({ time: d.time, value: d.close })));
+        } else {
+            // Default Candlestick
+            mainSeries = chart.addSeries(CandlestickSeries, {
+                upColor: '#089981',
+                downColor: '#F23645',
+                borderVisible: false,
+                 wickUpColor: '#089981',
+                 wickDownColor: '#F23645',
+             });
+            mainSeries.setData(data.map(d => ({
+                time: d.time,
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close,
+            })));
+        }
+
+        // Indicators
+        indicators.forEach(ind => {
+            const lineSeries = chart.addSeries(LineSeries, {
+                color: ind.color,
+                lineWidth: 2,
+                title: ind.name,
+            });
+            lineSeries.setData(ind.data);
         });
 
-        candlestickSeries.setData(data.map(d => ({
-            time: d.time,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close,
-        })));
 
         chart.timeScale().fitContent();
 
@@ -71,7 +108,7 @@ export const TradingViewChart = ({ data, colors = {} }: TradingViewChartProps) =
             window.removeEventListener('resize', handleResize);
             chart.remove();
         };
-    }, [data, colors]);
+    }, [data, colors, chartType, indicators]);
 
-    return <div ref={chartContainerRef} className="w-full h-[400px]" />;
+    return <div ref={chartContainerRef} className="w-full h-full" />;
 };

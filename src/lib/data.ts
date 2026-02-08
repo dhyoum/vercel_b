@@ -19,6 +19,14 @@ export interface Stock {
   volume: number;
   per: number;
   eps: number;
+  performance: {
+    '1W': number;
+    '1M': number;
+    '3M': number;
+    '6M': number;
+    'YTD': number;
+    '1Y': number;
+  };
 }
 
 const STOCK_NAMES = [
@@ -99,6 +107,16 @@ export const STOCKS: Stock[] = STOCK_NAMES.map((stock) => {
   const per = 8 + Math.random() * 20; // 8 ~ 28
   const eps = currentPrice / per;
 
+  // Generate random performance data
+  const performance = {
+    '1W': (Math.random() * 10) - 5,
+    '1M': (Math.random() * 20) - 10,
+    '3M': (Math.random() * 30) - 15,
+    '6M': (Math.random() * 40) - 20,
+    'YTD': (Math.random() * 50) - 25,
+    '1Y': (Math.random() * 60) - 30,
+  };
+
   return {
     id: stock.ticker,
     nameKo: stock.nameKo,
@@ -112,6 +130,7 @@ export const STOCKS: Stock[] = STOCK_NAMES.map((stock) => {
     volume,
     per,
     eps,
+    performance,
   };
 });
 

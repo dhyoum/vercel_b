@@ -11,6 +11,10 @@ export default function Dashboard() {
   const [language, setLanguage] = useState<'ko' | 'en'>('ko');
   const currency = language === 'ko' ? 'KRW' : 'USD';
 
+  const [chartType, setChartType] = useState<'Candlestick' | 'Area' | 'Line'>('Candlestick');
+  const [showSMA, setShowSMA] = useState(false);
+  const [showEMA, setShowEMA] = useState(false);
+
   // Hydration fix: Ensure component mounts before rendering data-dependent UI
   const [mounted, setMounted] = useState(false);
 
@@ -22,153 +26,259 @@ export default function Dashboard() {
 
   const activeStock = STOCKS.find(s => s.id === activeTab) || STOCKS[0];
 
+  // Calculate Indicators
+  const indicators = [];
+  if (showSMA) {
+    // Dynamic import to avoid SSR issues if any, though calculateSMA is pure logic
+    const { calculateSMA } = require("@/lib/indicators");
+    indicators.push({
+      name: 'SMA 20',
+      data: calculateSMA(activeStock.data, 20),
+      color: '#2962FF',
+    });
+  }
+  if (showEMA) {
+    const { calculateSMA } = require("@/lib/indicators");
+    indicators.push({
+      name: 'SMA 50', // Reusing SMA logic for demo simplicity as "EMA" pending implementation
+      data: calculateSMA(activeStock.data, 50),
+      color: '#FF9800',
+    });
+  }
+
+
   return (
-    <div
-      className="flex h-screen w-full bg-slate-100 text-slate-900 font-sans overflow-hidden selection:bg-blue-100"
-      style={{ backgroundColor: '#f1f5f9', color: '#0f172a' }} // Slate-100
-    >
-      {/* Sidebar - Card Style */}
-      <aside className="w-72 bg-white m-4 rounded-3xl shadow-sm border border-slate-200 flex flex-col z-20 overflow-hidden">
-        <div className="h-20 flex items-center px-6 border-b border-slate-100">
-          <div className="flex items-center gap-3 text-slate-900">
-            <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-600/20">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-lg tracking-tight">{language === 'ko' ? 'Stock Trends' : 'Stock Trends'}</span>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1">
-          {STOCKS.map((stock) => (
-            <button
-              key={stock.id}
-              onClick={() => setActiveTab(stock.id)}
-              className={cn(
-                "w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group flex justify-between items-center relative outline-none",
-                "active:scale-[0.98] hover:bg-slate-50",
-                activeTab === stock.id ? "bg-blue-50/50 shadow-sm ring-1 ring-blue-100" : "bg-transparent"
-              )}
-            >
-              <div className="overflow-hidden mr-3">
-                <span className={cn(
-                  "block text-sm truncate transition-colors mb-0.5",
-                  activeTab === stock.id ? "font-bold text-blue-900" : "font-medium text-slate-600 group-hover:text-slate-900"
-                )}>
-                  {language === 'ko' ? stock.nameKo : stock.nameEn}
-                </span>
-                <span className="text-[11px] text-slate-400 font-medium bg-slate-100 px-1.5 py-0.5 rounded">{stock.ticker}</span>
+    <div className="flex h-screen w-full bg-white text-[#131722] font-sans overflow-hidden">
+      {/* Main Chart Area (Left) */}
+      <main className="flex-1 flex flex-col min-w-0 border-r border-[#E0E3EB] overflow-hidden">
+        {/* Top Bar / Header */}
+        <header className="h-[52px] border-b border-[#E0E3EB] flex items-center px-4 justify-between bg-white shrink-0 overflow-x-auto custom-scrollbar">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 bg-black rounded text-white flex items-center justify-center font-bold text-xs">
+                {activeStock.ticker[0]}
               </div>
-              <div className="text-right shrink-0">
-                <div className={cn(
-                  "text-sm tabular-nums transition-colors font-semibold",
-                  activeTab === stock.id ? "text-blue-900" : "text-slate-900"
-                )}>
-                  {convertPrice(stock.currentPrice, currency)}
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-bold text-[#131722] text-sm">{activeStock.ticker}</span>
+                  <span className="text-xs text-[#787B86]">{language === 'ko' ? activeStock.nameKo : activeStock.nameEn}</span>
                 </div>
-                <div className={cn(
-                  "text-[11px] flex items-center justify-end font-semibold mt-1",
-                  stock.change >= 0 ? "text-blue-600" : "text-rose-500"
-                )}>
-                  {stock.change > 0 ? "+" : ""}{stock.change.toFixed(2)}%
+                <div className="text-[10px] text-[#787B86] flex gap-1">
+                  <span>KOSPI</span>
+                  <span>•</span>
+                  <span>D</span>
+                  <span>•</span>
+                  <span>KRW</span>
                 </div>
               </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <button
-            onClick={() => setLanguage(prev => prev === 'ko' ? 'en' : 'ko')}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-300 hover:text-blue-600 hover:shadow-md transition-all text-sm font-bold text-slate-600 active:scale-95"
-          >
-            <Globe className="w-4 h-4" />
-            {language === 'ko' ? 'Language: English' : '언어: 한국어'}
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content - Card Layout */}
-      <main className="flex-1 flex flex-col min-w-0 p-4 pl-0 gap-4">
-
-        {/* Header Card */}
-        <header className="bg-white rounded-3xl shadow-sm border border-slate-200 px-10 py-8 flex justify-between items-center z-10">
-          <div>
-            <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">
-              {language === 'ko' ? activeStock.nameKo : activeStock.nameEn}
-            </h2>
-            <div className="flex items-center gap-3 text-sm text-slate-500 font-medium">
-              <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-xs border border-slate-200 font-semibold">{activeStock.ticker}</span>
-              <span className="text-slate-300">|</span>
-              <span>KOSPI</span>
-              <span className="text-slate-300">|</span>
-              <span>Technology</span>
-            </div>
-          </div>
-
-          <div className="text-right flex items-center gap-8">
-            {/* Metrics in Header for better use of space */}
-            <div className="flex gap-8 mr-8 border-r border-slate-100 pr-8">
-              <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Market Cap</div>
-                <div className="font-semibold text-slate-700">{formatLargeNumber(currency === 'KRW' ? activeStock.marketCap : activeStock.marketCap / 1350, currency)}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Volume</div>
-                <div className="font-semibold text-slate-700">{formatLargeNumber(activeStock.volume, currency)}</div>
-              </div>
             </div>
 
-            <div>
-              <div
-                className="font-bold text-slate-900 tracking-tighter text-right"
-                style={{ fontSize: '3.5rem', lineHeight: '1' }}
+            <div className="h-6 w-[1px] bg-[#E0E3EB] mx-2"></div>
+
+            {/* Timeframe Toolbar */}
+            <div className="flex gap-1">
+              {['1D', '1W', '1M', '1Y', 'ALL'].map((tf, i) => (
+                <button 
+                  key={tf}
+                  className={cn(
+                    "px-3 py-1 text-[13px] font-semibold rounded hover:bg-[#F0F3FA] transition-colors",
+                    i === 2 ? "text-[#2962FF]" : "text-[#131722]"
+                  )}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+
+            <div className="h-6 w-[1px] bg-[#E0E3EB] mx-2"></div>
+
+            {/* Chart Controls */}
+            <div className="flex items-center gap-2">
+              <div className="flex bg-[#F0F3FA] rounded p-0.5">
+                <button
+                  onClick={() => setChartType('Candlestick')}
+                  className={cn("p-1 rounded text-xs", chartType === 'Candlestick' ? "bg-white shadow text-[#2962FF] font-bold" : "text-[#787B86]")}
+                  title="Candles"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setChartType('Line')}
+                  className={cn("p-1 rounded text-xs", chartType === 'Line' ? "bg-white shadow text-[#2962FF] font-bold" : "text-[#787B86]")}
+                  title="Line"
+                >
+                  <TrendingUp className="w-4 h-4 rotate-90" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowSMA(!showSMA)}
+                className={cn(
+                  "px-2 py-1 text-xs font-semibold rounded transition-colors border",
+                  showSMA ? "bg-[#e8f0fe] text-[#2962FF] border-[#2962FF]" : "bg-white text-[#131722] border-transparent hover:bg-[#F0F3FA]"
+                )}
               >
-                {convertPrice(activeStock.currentPrice, currency)}
-              </div>
-              <div className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold mt-2 float-right",
-                activeStock.change >= 0 ? "bg-blue-50 text-blue-600" : "bg-rose-50 text-rose-600"
-              )}>
-                {activeStock.change >= 0 ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />}
-                {Math.abs(activeStock.change).toFixed(2)}%
-                <span className="opacity-60 font-medium ml-1">
-                  {convertPrice(Math.abs(activeStock.changeAmount), currency)}
-                </span>
-              </div>
+                SMA 20
+              </button>
+              <button
+                onClick={() => setShowEMA(!showEMA)}
+                className={cn(
+                  "px-2 py-1 text-xs font-semibold rounded transition-colors border",
+                  showEMA ? "bg-[#fff3e0] text-[#FF9800] border-[#FF9800]" : "bg-white text-[#131722] border-transparent hover:bg-[#F0F3FA]"
+                )}
+              >
+                SMA 50
+              </button>
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setLanguage(prev => prev === 'ko' ? 'en' : 'ko')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded hover:bg-[#F0F3FA] text-xs font-medium text-[#131722] transition-colors"
+            >
+              <Globe className="w-3.5 h-3.5" />
+            </button>
+            <button className="px-3 py-1.5 bg-[#2962FF] hover:bg-[#1E53E5] text-white text-xs font-semibold rounded">
+              Publish
+            </button>
           </div>
         </header>
 
-        {/* Chart Card */}
-        <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden relative flex flex-col p-2">
-          {/* Toolbar - Top Right of Chart Area */}
-          <div className="absolute top-6 right-6 z-10 bg-slate-100/80 backdrop-blur p-1 rounded-xl flex gap-1 shadow-sm border border-slate-200/50">
-            {['1D', '1W', '1M', '1Y', 'ALL'].map((tf, i) => (
-              <button key={tf} className={cn(
-                "px-4 py-1.5 text-xs font-bold rounded-lg transition-all active:scale-95",
-                i === 2
-                  ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5"
-                  : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
-              )}>
-                {tf}
-              </button>
-            ))}
-          </div>
-
-          <div className="w-full h-full rounded-2xl overflow-hidden">
-            <TradingViewChart
-              data={activeStock.data}
-              colors={{
-                backgroundColor: '#ffffff',
-                textColor: '#64748b', // slate-500
-                lineColor: activeStock.change >= 0 ? '#2563eb' : '#ef4444', // blue-600 : rose-500
-                areaTopColor: activeStock.change >= 0 ? 'rgba(37, 99, 235, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                areaBottomColor: activeStock.change >= 0 ? 'rgba(37, 99, 235, 0)' : 'rgba(239, 68, 68, 0)',
-              }}
-            />
+        {/* Chart Container */}
+        <div className="flex-1 relative bg-white">
+          <TradingViewChart
+            data={activeStock.data}
+            chartType={chartType}
+            indicators={indicators}
+            colors={{
+              backgroundColor: '#ffffff',
+              textColor: '#787B86',
+              lineColor: activeStock.change >= 0 ? '#089981' : '#F23645',
+              areaTopColor: activeStock.change >= 0 ? 'rgba(8, 153, 129, 0.15)' : 'rgba(242, 54, 69, 0.15)',
+              areaBottomColor: activeStock.change >= 0 ? 'rgba(8, 153, 129, 0.0)' : 'rgba(242, 54, 69, 0.0)',
+            }}
+          />
+          {/* Legend/Status Overlay */}
+          <div className="absolute top-4 left-4 flex gap-4 text-xs font-mono z-10 pointer-events-none">
+            <span className={cn(
+              "font-bold",
+              activeStock.change >= 0 ? "text-[#089981]" : "text-[#F23645]"
+            )}>
+              O: {convertPrice(activeStock.currentPrice * 0.99, currency)} H: {convertPrice(activeStock.currentPrice * 1.01, currency)} L: {convertPrice(activeStock.currentPrice * 0.98, currency)} C: {convertPrice(activeStock.currentPrice, currency)}
+            </span>
+            {showSMA && <span style={{ color: '#2962FF' }}>SMA20</span>}
+            {showEMA && <span style={{ color: '#FF9800' }}>SMA50</span>}
           </div>
         </div>
       </main>
+
+      {/* Right Sidebar - Watchlist & Details */}
+      <aside className="w-[320px] flex flex-col bg-white shrink-0 z-20 shadow-lg relative">
+
+        {/* Watchlist Header */}
+        <div className="h-[52px] border-b border-[#E0E3EB] flex items-center justify-between px-4 shrink-0">
+          <span className="font-semibold text-[#131722] text-sm">Watchlist</span>
+          <div className="flex gap-2">
+            <Search className="w-4 h-4 text-[#787B86] cursor-pointer hover:text-[#131722]" />
+            <div className="w-[1px] h-4 bg-[#E0E3EB]"></div>
+            <ArrowDownIcon className="w-4 h-4 text-[#787B86] cursor-pointer hover:text-[#131722]" />
+          </div>
+        </div>
+
+        {/* Watchlist Table */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="flex px-4 py-2 border-b border-[#E0E3EB] text-[10px] text-[#787B86] font-medium">
+            <div className="w-1/3">Key</div>
+            <div className="w-1/3 text-right">Last</div>
+            <div className="w-1/3 text-right">Chg%</div>
+          </div>
+          {STOCKS.map((stock) => (
+            <div
+              key={stock.id}
+              onClick={() => setActiveTab(stock.id)}
+              className={cn(
+                "flex px-4 py-3 border-b border-[#F0F3FA] cursor-pointer hover:bg-[#F0F3FA] transition-colors items-center",
+                activeTab === stock.id ? "bg-[#F0F3FA]" : ""
+              )}
+            >
+              <div className="w-1/3 overflow-hidden">
+                <div className="font-semibold text-sm text-[#131722] truncate">{stock.ticker}</div>
+                <div className="text-[10px] text-[#787B86] truncate">{language === 'ko' ? stock.nameKo : stock.nameEn}</div>
+              </div>
+              <div className="w-1/3 text-right text-sm text-[#131722] font-mono">
+                {convertPrice(stock.currentPrice, currency).replace(/[^0-9.,]/g, '')}
+              </div>
+              <div className="w-1/3 text-right flex justify-end">
+                <span className={cn(
+                  "text-xs font-medium px-1.5 py-0.5 rounded text-white min-w-[50px] text-center",
+                  stock.change >= 0 ? "bg-[#089981]" : "bg-[#F23645]"
+                )}>
+                  {stock.change > 0 ? "+" : ""}{stock.change.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+
+        {/* Bottom Details Panel */}
+        <div className="h-[250px] border-t border-[#E0E3EB] flex flex-col bg-white shrink-0">
+          <div className="p-4">
+            {/* Key Statistics Grid */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-6">
+              <div className="flex justify-between items-center border-b border-[#F0F3FA] pb-1">
+                <span className="text-xs text-[#787B86]">Open</span>
+                <span className="text-sm font-medium text-[#131722]">{convertPrice(activeStock.currentPrice * 0.99, currency)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-[#F0F3FA] pb-1">
+                <span className="text-xs text-[#787B86]">High</span>
+                <span className="text-sm font-medium text-[#131722]">{convertPrice(activeStock.currentPrice * 1.01, currency)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-[#F0F3FA] pb-1">
+                <span className="text-xs text-[#787B86]">Low</span>
+                <span className="text-sm font-medium text-[#131722]">{convertPrice(activeStock.currentPrice * 0.98, currency)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-[#F0F3FA] pb-1">
+                <span className="text-xs text-[#787B86]">Volume</span>
+                <span className="text-sm font-medium text-[#131722]">{formatLargeNumber(activeStock.volume, currency)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-[#F0F3FA] pb-1">
+                <span className="text-xs text-[#787B86]">Mkt Cap</span>
+                <span className="text-sm font-medium text-[#131722]">{formatLargeNumber(activeStock.marketCap, currency)}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-[#F0F3FA] pb-1">
+                <span className="text-xs text-[#787B86]">PER</span>
+                <span className="text-sm font-medium text-[#131722]">{activeStock.per.toFixed(2)}x</span>
+              </div>
+            </div>
+
+            {/* Performance Grid */}
+            <div>
+              <div className="text-sm font-bold text-[#131722] mb-2">Performance</div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: '1W', val: activeStock.performance['1W'] },
+                  { label: '1M', val: activeStock.performance['1M'] },
+                  { label: '3M', val: activeStock.performance['3M'] },
+                  { label: '6M', val: activeStock.performance['6M'] },
+                  { label: 'YTD', val: activeStock.performance['YTD'] },
+                  { label: '1Y', val: activeStock.performance['1Y'] }
+                ].map((p, i) => (
+                  <div key={p.label} className={cn(
+                    "flex flex-col items-center justify-center py-1.5 rounded",
+                    p.val >= 0 ? "bg-[#E6F4F1] text-[#00796B]" : "bg-[#FDECEF] text-[#D32F2F]"
+                  )}>
+                      <span className="text-xs font-bold">{p.val > 0 ? "+" : ""}{p.val.toFixed(2)}%</span>
+                      <span className="text-[10px] font-medium text-[#787B86]">{p.label}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </aside >
     </div>
   );
 }
